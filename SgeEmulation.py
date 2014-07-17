@@ -7,17 +7,17 @@ class SgeError(Exception):
  
 class SgeJob():
  
-    def __init__(self,runtime=100,initial_status="queued"):
+    def __init__(self,runtime=100,initial_status="queued",dependence=[]):
         self.runtime=runtime
         self.status=initial_status
-        
+        self.dependence=dependence
  
 class SgeEmulator():
-"""This is an emulator for a Sun Grid Engine
-It is from the point of view of a single user, so the number of
-available processors is a random number.
-It doesn't need to implement all aspects of a Sun Grid Engine, just those
-that are necessary to test my queuing strategies."""
+    """This is an emulator for a Sun Grid Engine
+    It is from the point of view of a single user, so the number of
+    available processors can vary.
+    It doesn't need to implement all aspects of a Sun Grid Engine, just those
+    that are necessary to test my queuing strategies."""
    
     def __init__(self,min_slots=0,max_slots=10):
         self._jobdict={}
@@ -26,11 +26,15 @@ that are necessary to test my queuing strategies."""
         except ValueError:
             self._slots=min_slots
  
-    def add_job(self,jobname,runtime=100,initial_status="queued"):
+    def add_job(self,jobname,runtime=100,initial_status="queued",dependence=[]):
         if initial_status in ["queued","hold"]:
             self._jobdict[jobname]=SgeJob(runtime,initial_status)
         else:
             raise SgeError("Initial job status can only be 'queued' or 'hold'")
+        depindict=set(dependence) & set(self._jobdict.keys())
+        for depjob in depindict:
+            if self._jobdict[depjob].status in ("queued","running"):
+                self._jobdict[jobname].status="waiting"
  
     def get_job_names(self):
         return self._jobdict.keys()
@@ -116,6 +120,32 @@ class TestSgeEmulator(unittest.TestCase):
         emu.hold_job("test")
         emu.tick(10)
         self.assertTrue(emu.get_job_status("test")=="hold")
-      
+
+    def test_depends_on_absent_job(self):
+        """If you make a job dependent on another job that isn't in the queue,
+        it should just be queued normally."""
+        emu=SgeEmulator(1,1)
+        emu.add_job("test",1,"queued","non-existant job")
+        self.assertTrue(emu.get_job_status("test")=="queued")
+
+    def test_depends_on_finished_job(self):
+        """If you make a job dependent on another job that has already finished,
+        it should just be queued normally"""
+        emu=SgeEmulator(1,1)
+        emu.add_job("test",6)
+        emu.tick(1)
+        emu.tick(5)
+        emu.add_job("deptest",1,"queued","test")
+        self.assertTrue(emu.get_job_status("deptest")=="queued")
+
+    def test_depends_on_running_job(self):
+        """If you make a job dependent on another job that is running,
+        it should having status waiting"""
+        emu=SgeEmulator(1,1)
+        emu.add_job("test",6)
+        emu.tick(1)
+        emu.add_job("deptest",1,"queued",["test"])
+        self.assertTrue(emu.get_job_status("deptest")=="waiting")
+        
 if __name__ == "__main__":
     unittest.main()
