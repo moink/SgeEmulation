@@ -51,7 +51,7 @@ class SgeEmulator():
             if job.status=="running":
                 job.runtime=job.runtime-ticklength
                 if job.runtime<=0:
-                    job.status=="finished"
+                    job.status="finished"
                 else:
                     runcount=runcount+1    
         freeslots=self._slots-runcount
@@ -92,11 +92,19 @@ class TestSgeEmulator(unittest.TestCase):
         #runtime of that job, the job should finish
         emu=SgeEmulator(1,1)
         emu.add_job("test",6)
-        emu.tick(6)
-        self.assertTrue(emu.get_job_status("test")=="running")
-        emu.add_job("test",6)
-        emu.tick(8)
-        self.assertTrue(emu.get_job_status("test")=="running")
+        emu.tick(1)
+        emu.tick(5)
+        print(emu.get_job_status("test"))
+        self.assertTrue(emu.get_job_status("test")=="finished")
+        emu.add_job("test2",6)
+        emu.tick(7)
+        emu.tick(1)
+        self.assertTrue(emu.get_job_status("test2")=="finished")
+        emu.add_job("test3",6)
+        emu.tick(3)
+        self.assertTrue(emu.get_job_status("test3")=="running")
+        emu.tick(4)
+        self.assertTrue(emu.get_job_status("test2")=="finished")
       
 if __name__ == "__main__":
     unittest.main()
