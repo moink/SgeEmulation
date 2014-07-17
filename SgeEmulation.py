@@ -7,8 +7,7 @@ class SgeError(Exception):
  
 class SgeJob():
  
-    def __init__(self,jobname,runtime=100,initial_status="queued"):
-        self.jobname=jobname
+    def __init__(self,runtime=100,initial_status="queued"):
         self.runtime=runtime
         self.status=initial_status
         
@@ -21,7 +20,7 @@ class SgeEmulator():
 #that are necessary to test my queuing strategies.
    
     def __init__(self,min_slots=0,max_slots=10):
-        self._joblist=[]
+        self._jobdict={}
         try:
             self._slots=random.randrange(min_slots,max_slots)
         except ValueError:
@@ -29,40 +28,45 @@ class SgeEmulator():
  
     def add_job(self,jobname,runtime=100,initial_status="queued"):
         if initial_status in ["queued","hold"]:
-            self._joblist.append(SgeJob(jobname,runtime,initial_status))
+            self._jobdict[jobname]=SgeJob(runtime,initial_status)
         else:
             raise SgeError("Initial job status can only be 'queued' or 'hold'")
  
     def get_job_names(self):
-        jobnames=[]
-        for job in self._joblist:
-            jobnames.append(job.jobname)
-        return jobnames
+        #jobnames=[]
+        #for job in self._jobdict:
+        #    jobnames.append(job.jobname)
+        return self._jobdict.keys()
  
     def get_job_status(self,jobname):
-        for job in self._joblist:
-            if job.jobname==jobname:
-                return job.status
-        return "absent"
+        try:
+            return self._jobdict[jobname].status
+        except KeyError:
+            return "absent"
+
+    def hold_job(self,jobname):
+        pass
  
     def tick(self,ticklength=1):
         runcount=0
-        for job in self._joblist:
-            if job.status=="running":
-                job.runtime=job.runtime-ticklength
-                if job.runtime<=0:
-                    job.status="finished"
+        for jobname in self._jobdict:
+            if self._jobdict[jobname].status=="running":
+                self._jobdict[jobname].runtime=(
+                    self._jobdict[jobname].runtime-ticklength)
+                if self._jobdict[jobname].runtime<=0:
+                    self._jobdict[jobname].status="finished"
                 else:
                     runcount=runcount+1    
         freeslots=self._slots-runcount
         i=0;
-        while freeslots>0 and i<len(self._joblist):
-            if self._joblist[i].status=="queued":
-                self._joblist[i].status="running"
-                self._joblist[i].runtime=self._joblist[i].runtime-ticklength
-                freeslots=freeslots-1
-            i=i+1
-                
+        if freeslots>0:
+            for jobname in self._jobdict:
+                if self._jobdict[jobname].status=="queued":
+                    self._jobdict[jobname].status="running"
+                    self._jobdict[jobname].runtime=self._jobdict[jobname].runtime-ticklength
+                    freeslots=freeslots-1
+                    if freeslots==0:
+                        break
  
 class TestSgeEmulator(unittest.TestCase):
 
@@ -94,7 +98,6 @@ class TestSgeEmulator(unittest.TestCase):
         emu.add_job("test",6)
         emu.tick(1)
         emu.tick(5)
-        print(emu.get_job_status("test"))
         self.assertTrue(emu.get_job_status("test")=="finished")
         emu.add_job("test2",6)
         emu.tick(7)
@@ -104,7 +107,16 @@ class TestSgeEmulator(unittest.TestCase):
         emu.tick(3)
         self.assertTrue(emu.get_job_status("test3")=="running")
         emu.tick(4)
-        self.assertTrue(emu.get_job_status("test2")=="finished")
+        self.assertTrue(emu.get_job_status("test3")=="finished")
+
+    def test_hold_job(self):
+        #if you put a job on hold, it should have the status "hold"
+        #it should also not run, no matter how many slots are free
+        emu=SgeEmulator(10,10)
+        emu.add_job("test",1)
+        emu.hold_job("test")
+        emu.tick(10)
+        self.assertTrue(emu.get_job_status("test")=="hold")
       
 if __name__ == "__main__":
     unittest.main()
