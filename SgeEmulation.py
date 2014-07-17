@@ -46,10 +46,23 @@ class SgeEmulator():
         return "absent"
  
     def tick(self,ticklength=1):
+        runcount=0
         for job in self._joblist:
             if job.status=="running":
                 job.runtime=job.runtime-ticklength
-            
+                if job.runtime<=0:
+                    job.status=="queued"
+                else:
+                    runcount=runcount+1    
+        freeslots=self._slots-runcount
+        i=0;
+        while freeslots>0 and i<len(self._joblist):
+            if self._joblist[i].status=="queued":
+                freeslots=freeslots-1
+                self._joblist[i].status="running"
+                self._joblist[i].runtime=self._joblist[i].runtime-ticklength
+                i=i+1
+                
  
 class TestSgeEmulator(unittest.TestCase):
 
