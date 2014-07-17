@@ -51,17 +51,17 @@ class SgeEmulator():
             if job.status=="running":
                 job.runtime=job.runtime-ticklength
                 if job.runtime<=0:
-                    job.status=="queued"
+                    job.status=="finished"
                 else:
                     runcount=runcount+1    
         freeslots=self._slots-runcount
         i=0;
         while freeslots>0 and i<len(self._joblist):
             if self._joblist[i].status=="queued":
-                freeslots=freeslots-1
                 self._joblist[i].status="running"
                 self._joblist[i].runtime=self._joblist[i].runtime-ticklength
-                i=i+1
+                freeslots=freeslots-1
+            i=i+1
                 
  
 class TestSgeEmulator(unittest.TestCase):
@@ -85,6 +85,17 @@ class TestSgeEmulator(unittest.TestCase):
         emu=SgeEmulator(1,1)
         emu.add_job("test",100)
         emu.tick()
+        self.assertTrue(emu.get_job_status("test")=="running")
+
+    def test_job_finishes(self):
+        #when  a job is running, then you do a tick length greater or equal to the
+        #runtime of that job, the job should finish
+        emu=SgeEmulator(1,1)
+        emu.add_job("test",6)
+        emu.tick(6)
+        self.assertTrue(emu.get_job_status("test")=="running")
+        emu.add_job("test",6)
+        emu.tick(8)
         self.assertTrue(emu.get_job_status("test")=="running")
       
 if __name__ == "__main__":
